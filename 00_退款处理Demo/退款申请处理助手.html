@@ -1,0 +1,597 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>退款申请处理助手</title>
+  <style>
+    :root {
+      --ink: #172033;
+      --muted: #758197;
+      --line: #e5e9f0;
+      --canvas: #f7f8fb;
+      --panel: #ffffff;
+      --blue: #3568de;
+      --blue-weak: #eff4ff;
+      --green: #16795a;
+      --green-weak: #ecf8f2;
+      --amber: #9a6100;
+      --amber-weak: #fff7e7;
+      --purple: #6456b6;
+      --purple-weak: #f3f1ff;
+      --red: #bf3d48;
+      --red-weak: #fff1f2;
+      --radius: 16px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      background: var(--canvas);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      line-height: 1.5;
+    }
+
+    button, input, select, textarea { font: inherit; }
+    button { cursor: pointer; }
+
+    .shell { width: min(1080px, calc(100% - 40px)); margin: 0 auto; padding: 42px 0 56px; }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 22px;
+    }
+
+    .eyebrow {
+      margin: 0 0 5px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .08em;
+    }
+
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { margin-bottom: 0; font-size: clamp(25px, 4vw, 32px); letter-spacing: -.035em; line-height: 1.15; }
+
+    .tool-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 30px;
+      padding: 0 10px;
+      border: 1px solid #dfe6f8;
+      border-radius: 999px;
+      background: var(--blue-weak);
+      color: #3559a7;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(0, .94fr) minmax(0, 1.06fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .panel {
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      box-shadow: 0 5px 18px rgba(31, 47, 79, .035);
+    }
+
+    .panel-header { display: flex; align-items: center; justify-content: space-between; min-height: 67px; padding: 0 22px; border-bottom: 1px solid var(--line); }
+    .panel-header h2 { margin: 0; font-size: 16px; letter-spacing: -.015em; }
+    .panel-header span { color: var(--muted); font-size: 12px; }
+    .panel-body { padding: 22px; }
+
+    .form-section + .form-section { margin-top: 23px; padding-top: 23px; border-top: 1px solid var(--line); }
+    .section-title { margin: 0 0 13px; color: #47546a; font-size: 12px; font-weight: 800; }
+    .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .field { min-width: 0; }
+    .field.full { grid-column: 1 / -1; }
+
+    label { display: block; margin-bottom: 7px; color: #4d596d; font-size: 12px; font-weight: 700; }
+    input, select, textarea {
+      width: 100%;
+      border: 1px solid #dce2eb;
+      border-radius: 10px;
+      outline: none;
+      background: #fff;
+      color: var(--ink);
+      transition: border-color .16s, box-shadow .16s;
+    }
+    input, select { height: 43px; padding: 0 11px; }
+    textarea { min-height: 76px; padding: 10px 11px; resize: vertical; }
+    input::placeholder, textarea::placeholder { color: #adb6c5; }
+    input:focus, select:focus, textarea:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(53, 104, 222, .12); }
+
+    .hidden { display: none !important; }
+    .actions { display: flex; align-items: center; gap: 12px; margin-top: 24px; }
+    .primary {
+      flex: 1;
+      min-height: 46px;
+      border: 0;
+      border-radius: 10px;
+      background: var(--blue);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: .01em;
+      transition: background .16s, transform .16s;
+    }
+    .primary:hover { background: #2857c7; }
+    .primary:active { transform: translateY(1px); }
+    .quiet-button { border: 0; background: transparent; color: var(--muted); font-size: 12px; font-weight: 700; }
+    .quiet-button:hover { color: var(--ink); }
+
+    .error-box { margin-top: 14px; padding: 11px 12px; border: 1px solid #f1c7cc; border-radius: 10px; background: var(--red-weak); color: var(--red); font-size: 12px; font-weight: 700; }
+
+    .result-shell { position: sticky; top: 16px; }
+    .empty-state { display: grid; min-height: 410px; padding: 28px; place-content: center; text-align: center; }
+    .empty-mark { display: grid; width: 42px; height: 42px; margin: 0 auto 13px; place-items: center; border-radius: 12px; background: var(--blue-weak); color: var(--blue); font-size: 19px; font-weight: 800; }
+    .empty-state h3 { margin-bottom: 5px; font-size: 15px; }
+    .empty-state p { max-width: 245px; margin: 0; color: var(--muted); font-size: 12px; }
+
+    .result-body { padding: 20px 22px 22px; }
+    .status-card { display: flex; align-items: flex-start; justify-content: space-between; gap: 13px; padding: 18px; border: 1px solid #d9e4fb; border-radius: 13px; background: #f8faff; }
+    .status-card.supplement { border-color: #f2dba4; background: #fffaf0; }
+    .status-card.manual { border-color: #dedbf7; background: #f9f8ff; }
+    .status-card.approved { border-color: #cce7da; background: #f5fcf8; }
+    .status-kicker { margin: 0 0 5px; color: var(--muted); font-size: 11px; font-weight: 700; }
+    .status-title { margin: 0 0 4px; font-size: 27px; font-weight: 850; letter-spacing: -.04em; line-height: 1.05; }
+    .status-note { margin: 0; color: var(--muted); font-size: 12px; }
+    .status-tag { flex: 0 0 auto; margin-top: 1px; padding: 6px 9px; border-radius: 999px; background: var(--blue-weak); color: #3959a2; font-size: 11px; font-weight: 800; white-space: nowrap; }
+    .supplement .status-tag { background: var(--amber-weak); color: var(--amber); }
+    .manual .status-tag { background: var(--purple-weak); color: var(--purple); }
+    .approved .status-tag { background: var(--green-weak); color: var(--green); }
+    .rejected { border-color: #f0c5ca; background: var(--red-weak); }
+    .rejected .status-tag { background: var(--red-weak); color: var(--red); }
+
+    .next-step { margin-top: 16px; padding: 15px 16px; border-radius: 12px; background: #f7f9fc; }
+    .block-label { margin: 0 0 8px; color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: .06em; }
+    .action-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+    .action-list li { display: flex; gap: 8px; color: #354258; font-size: 13px; font-weight: 650; }
+    .action-list li::before { color: var(--blue); content: "→"; font-weight: 900; }
+
+    .signal-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; margin-top: 16px; }
+    .signal { min-width: 0; padding: 12px; border: 1px solid var(--line); border-radius: 11px; }
+    .signal-label { display: block; margin-bottom: 6px; color: var(--muted); font-size: 11px; font-weight: 700; }
+    .signal-value { display: block; color: #435069; font-size: 12px; font-weight: 800; }
+    .signal-value.risk { color: var(--red); }
+    .signal-value.required { color: var(--amber); }
+
+    .reason-panel { margin-top: 16px; border-top: 1px solid var(--line); }
+    .reason-panel summary { display: flex; align-items: center; justify-content: space-between; padding: 15px 0 0; color: #536078; font-size: 12px; font-weight: 750; cursor: pointer; list-style: none; }
+    .reason-panel summary::-webkit-details-marker { display: none; }
+    .reason-panel summary::after { margin-left: auto; color: #9aa5b7; content: "+"; font-size: 17px; font-weight: 400; }
+    .reason-panel[open] summary::after { content: "−"; }
+    .reason-count { margin-left: 7px; color: var(--muted); font-size: 11px; font-weight: 600; }
+    .rule-list { display: grid; gap: 7px; margin: 11px 0 0; padding: 0; list-style: none; }
+    .rule-list li { position: relative; padding-left: 13px; color: #68758a; font-size: 12px; }
+    .rule-list li::before { position: absolute; left: 0; color: var(--blue); content: "•"; }
+
+    .manual-review { margin-top: 18px; padding: 16px; border: 1px solid #e2def8; border-radius: 12px; background: #fbfaff; }
+    .manual-review h3 { margin: 0 0 4px; color: #4e478b; font-size: 13px; }
+    .manual-review p { margin: 0 0 12px; color: var(--muted); font-size: 11px; }
+    .review-grid { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); gap: 9px; }
+    .review-grid select, .review-grid textarea { border-color: #ddd9f1; background: #fff; }
+    .review-grid textarea { min-height: 65px; }
+    .review-submit { min-height: 38px; margin-top: 10px; padding: 0 13px; border: 0; border-radius: 9px; background: var(--purple); color: #fff; font-size: 12px; font-weight: 800; }
+    .review-submit:hover { background: #55489f; }
+    .review-error { min-height: 0; margin: 9px 0 0 !important; color: var(--red) !important; font-size: 11px !important; font-weight: 700; }
+
+    @media (max-width: 820px) {
+      .workspace { grid-template-columns: 1fr; }
+      .result-shell { position: static; }
+      .empty-state { min-height: 230px; }
+    }
+
+    @media (max-width: 560px) {
+      .shell { width: min(100% - 24px, 560px); padding-top: 26px; }
+      .topbar { align-items: flex-start; }
+      .tool-badge { display: none; }
+      .panel-header, .panel-body, .result-body { padding-left: 16px; padding-right: 16px; }
+      .form-grid, .signal-grid, .review-grid { grid-template-columns: 1fr; }
+      .field.full { grid-column: auto; }
+      .status-card { display: block; }
+      .status-tag { display: inline-flex; margin-top: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">客服工作台</p>
+        <h1>退款申请处理</h1>
+      </div>
+      <span class="tool-badge">处理助手</span>
+    </header>
+
+    <section class="workspace">
+      <article class="panel">
+        <header class="panel-header">
+          <h2>申请信息</h2>
+          <span>填写后提交</span>
+        </header>
+        <div class="panel-body">
+          <form id="refundForm" novalidate>
+            <section class="form-section">
+              <h3 class="section-title">订单与时间</h3>
+              <div class="form-grid">
+                <div class="field">
+                  <label for="userId">用户 ID</label>
+                  <input id="userId" name="userId"  autocomplete="off" />
+                </div>
+                <div class="field">
+                  <label for="orderNo">订单号</label>
+                  <input id="orderNo" name="orderNo"  autocomplete="off" />
+                </div>
+                <div class="field">
+                  <label for="purchaseTime">购买时间</label>
+                  <input id="purchaseTime" name="purchaseTime" type="datetime-local" />
+                </div>
+                <div class="field">
+                  <label for="applicationTime">退款申请时间</label>
+                  <input id="applicationTime" name="applicationTime" type="datetime-local" />
+                </div>
+              </div>
+            </section>
+
+            <section class="form-section">
+              <h3 class="section-title">退款信息</h3>
+              <div class="form-grid">
+                <div class="field">
+                  <label for="amount">退款金额（元）</label>
+                  <input id="amount" name="amount" type="number" min="0" step="0.01"  />
+                </div>
+                <div class="field">
+                  <label for="coreService">是否使用核心服务</label>
+                  <select id="coreService" name="coreService">
+                    <option value="">请选择</option>
+                    <option value="no">未使用</option>
+                    <option value="yes">已使用</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="historyRefunds">近 7 天退款次数</label>
+                  <input id="historyRefunds" name="historyRefunds" type="number" min="0" step="1"  />
+                </div>
+                <div class="field">
+                  <label for="infoComplete">信息是否完整</label>
+                  <select id="infoComplete" name="infoComplete">
+                    <option value="">请选择</option>
+                    <option value="yes">完整</option>
+                    <option value="no">不完整</option>
+                  </select>
+                </div>
+                <div class="field full">
+                  <label for="exceptionCase">异常情况（可选）</label>
+                  <select id="exceptionCase" name="exceptionCase">
+                    <option value="none">无</option>
+                    <option value="order_not_found">订单查不到</option>
+                    <option value="purchase_time_unavailable">购买时间查询失败</option>
+                    <option value="core_usage_abnormal">核心服务使用记录异常</option>
+                  </select>
+                </div>
+                <div class="field full hidden" id="missingMaterialsField">
+                  <label for="missingMaterials">缺失材料</label>
+                  <textarea id="missingMaterials" name="missingMaterials" placeholder="填写当前已知缺失材料"></textarea>
+                </div>
+              </div>
+            </section>
+
+            <div class="actions">
+              <button class="primary" type="submit">判断处理结果</button>
+              <button class="quiet-button" type="button" id="resetButton">清空</button>
+            </div>
+            <div id="formError" class="error-box hidden" role="alert"></div>
+          </form>
+        </div>
+      </article>
+
+      <article class="panel result-shell">
+        <header class="panel-header">
+          <h2>处理结果</h2>
+          <span>实时判断</span>
+        </header>
+        <div id="emptyState" class="empty-state">
+          <div class="empty-mark">→</div>
+          <h3>等待提交</h3>
+          <p>填写申请信息后，这里会显示当前状态和下一步。</p>
+        </div>
+        <div id="resultBody" class="result-body hidden" aria-live="polite"></div>
+      </article>
+    </section>
+  </main>
+
+  <script>
+    (() => {
+      const $ = (selector) => document.querySelector(selector);
+      const form = $("#refundForm");
+      const infoComplete = $("#infoComplete");
+      const missingMaterialsField = $("#missingMaterialsField");
+      const formError = $("#formError");
+      const emptyState = $("#emptyState");
+      const resultBody = $("#resultBody");
+
+      function syncMissingMaterials() {
+        missingMaterialsField.classList.toggle("hidden", infoComplete.value !== "no");
+      }
+
+      function clearError() {
+        formError.textContent = "";
+        formError.classList.add("hidden");
+      }
+
+      function showError(messages) {
+        formError.innerHTML = messages.map((message) => `<div>${escapeHtml(message)}</div>`).join("");
+        formError.classList.remove("hidden");
+      }
+
+      function escapeHtml(value) {
+        return String(value)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      function collectValues() {
+        return {
+          userId: form.elements.userId.value.trim(),
+          orderNo: form.elements.orderNo.value.trim(),
+          purchaseTime: form.elements.purchaseTime.value,
+          applicationTime: form.elements.applicationTime.value,
+          amountRaw: form.elements.amount.value,
+          amount: Number(form.elements.amount.value),
+          coreServiceValue: form.elements.coreService.value,
+          coreUsed: form.elements.coreService.value === "yes",
+          historyRefundsRaw: form.elements.historyRefunds.value,
+          historyRefunds: Number(form.elements.historyRefunds.value),
+          infoCompleteValue: form.elements.infoComplete.value,
+          infoComplete: form.elements.infoComplete.value === "yes",
+          exceptionCase: form.elements.exceptionCase.value,
+          missingMaterials: form.elements.missingMaterials.value.trim()
+        };
+      }
+
+      function validate(values) {
+        const errors = [];
+        if (!values.userId) errors.push("请填写用户 ID。");
+        if (!values.orderNo) errors.push("请填写订单号。");
+        if (!values.purchaseTime) errors.push("请选择购买时间。");
+        if (!values.applicationTime) errors.push("请选择退款申请时间。");
+        if (values.amountRaw === "" || !Number.isFinite(values.amount) || values.amount < 0) errors.push("请填写有效的退款金额。");
+        if (!values.coreServiceValue) errors.push("请选择是否使用核心服务。");
+        if (values.historyRefundsRaw === "" || !Number.isInteger(values.historyRefunds) || values.historyRefunds < 0) errors.push("近 7 天退款次数需为不小于 0 的整数。");
+        if (!values.infoCompleteValue) errors.push("请选择信息是否完整。");
+
+        if (values.purchaseTime && values.applicationTime) {
+          const purchase = new Date(values.purchaseTime);
+          const application = new Date(values.applicationTime);
+          if (Number.isNaN(purchase.getTime()) || Number.isNaN(application.getTime())) errors.push("购买时间或退款申请时间无效。");
+          else if (application < purchase) errors.push("退款申请时间不能早于购买时间。");
+        }
+        return errors;
+      }
+
+      function evaluate(values) {
+        const purchase = new Date(values.purchaseTime);
+        const application = new Date(values.applicationTime);
+        // 已确认口径：7 天按自然日；近 7 天退款次数 ≥ 2 视为多次退款。
+        const toCalendarDay = (date) => Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+        const calendarDays = Math.round((toCalendarDay(application) - toCalendarDay(purchase)) / (24 * 60 * 60 * 1000));
+        const withinSevenDays = calendarDays <= 7;
+        const overSevenDays = calendarDays > 7;
+        const over500 = values.amount > 500;
+        const multipleRefunds = values.historyRefunds >= 2;
+        const priorityEligible = withinSevenDays && !values.coreUsed;
+        const exceptionLabels = {
+          none: "无",
+          order_not_found: "订单查不到",
+          purchase_time_unavailable: "购买时间查询失败",
+          core_usage_abnormal: "核心服务使用记录异常"
+        };
+        const exceptionActions = {
+          order_not_found: "先核实订单，不直接拒绝。",
+          purchase_time_unavailable: "转人工核查购买时间。",
+          core_usage_abnormal: "转人工审核核心服务使用记录。"
+        };
+        const hasException = values.exceptionCase !== "none";
+
+        // 多次退款、金额超过 500 元和异常分支均保留人工处理要求；不会自动生成“拒绝”。
+        const manualRequired = overSevenDays || values.coreUsed || multipleRefunds || over500 || hasException;
+        const reasons = [];
+        if (!values.infoComplete) reasons.push("信息不完整");
+        if (priorityEligible) reasons.push("7 天内且未使用核心服务");
+        if (overSevenDays) reasons.push("购买超过 7 天");
+        if (values.coreUsed) reasons.push("已使用核心服务");
+        if (over500) reasons.push("退款金额超过 500 元");
+        if (multipleRefunds) reasons.push("近 7 天退款达到 2 次，已标记风险");
+        if (hasException) reasons.push(`异常：${exceptionLabels[values.exceptionCase]}`);
+
+        let status = "通过";
+        let statusClass = "approved";
+        let statusTag = "已通过";
+        let statusNote = "符合优先退款条件，系统已自动通过并执行退款";
+        let actions = ["系统自动通过并执行退款。"];
+
+        if (!values.infoComplete) {
+          status = "补充材料中";
+          statusClass = "supplement";
+          statusTag = "待补充";
+          statusNote = "等待用户补齐申请材料";
+          actions = [values.missingMaterials ? `请补充：${values.missingMaterials}。` : "请补充缺失材料。"];
+          if (manualRequired) actions.push("材料补全后，继续执行已触发的审核或确认流程。");
+        } else if (manualRequired) {
+          status = "人工审核中";
+          statusClass = "manual";
+          statusTag = "待审核";
+          statusNote = "已转入人工处理";
+          if (hasException) {
+            actions = [exceptionActions[values.exceptionCase]];
+            if (over500) actions.push("核实后仍需提交管理者确认。");
+          } else if (priorityEligible && over500) actions = ["提交管理者确认，暂不退款。"];
+          else if (over500) actions = ["提交人工审核，并申请管理者确认。"];
+          else if (multipleRefunds) actions = ["提交人工审核，并保留风险标记。"];
+          else actions = ["提交人工审核。"];
+        }
+
+        return {
+          status,
+          statusClass,
+          statusTag,
+          statusNote,
+          actions,
+          reasons,
+          risk: multipleRefunds,
+          manualRequired,
+          manager: over500,
+          exceptionLabel: exceptionLabels[values.exceptionCase],
+          exceptionCase: values.exceptionCase
+        };
+      }
+
+      function renderResult(result) {
+        emptyState.classList.add("hidden");
+        resultBody.classList.remove("hidden");
+        const actionItems = result.actions.map((action) => `<li>${escapeHtml(action)}</li>`).join("");
+        const reasonItems = result.reasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join("");
+        const reviewPanel = result.status === "人工审核中" && result.manualDecision !== "approved" ? `
+          <section class="manual-review">
+            <h3>人工审核结论</h3>
+            <p>由审核人员确认；选择“拒绝”时必须填写原因。</p>
+            <div class="review-grid">
+              <select id="manualDecision" aria-label="人工审核结论">
+                <option value="pending">未作出结论</option>
+                <option value="approved">通过</option>
+                <option value="rejected">拒绝</option>
+              </select>
+              <textarea id="rejectionReason" class="hidden" aria-label="拒绝原因" placeholder="填写拒绝原因"></textarea>
+            </div>
+            <button class="review-submit" type="button" id="applyReviewButton">确认人工审核结论</button>
+            <p class="review-error" id="reviewError" role="alert"></p>
+          </section>
+        ` : "";
+
+        resultBody.innerHTML = `
+          <section class="status-card ${result.statusClass}">
+            <div>
+              <p class="status-kicker">当前状态</p>
+              <h2 class="status-title">${escapeHtml(result.status)}</h2>
+              <p class="status-note">${escapeHtml(result.statusNote)}</p>
+            </div>
+            <span class="status-tag">${escapeHtml(result.statusTag)}</span>
+          </section>
+          <section class="next-step">
+            <p class="block-label">下一步</p>
+            <ul class="action-list">${actionItems}</ul>
+          </section>
+          <section class="signal-grid" aria-label="内部处理信息">
+            <div class="signal">
+              <span class="signal-label">风险标记</span>
+              <span class="signal-value ${result.risk ? "risk" : ""}">${result.risk ? "已标记" : "无"}</span>
+            </div>
+            <div class="signal">
+              <span class="signal-label">人工审核</span>
+              <span class="signal-value ${result.manualRequired ? "required" : ""}">${result.manualRequired ? "需要" : "不需要"}</span>
+            </div>
+            <div class="signal">
+              <span class="signal-label">管理者确认</span>
+              <span class="signal-value ${result.manager ? "required" : ""}">${result.manager ? "需要" : "不需要"}</span>
+            </div>
+            <div class="signal">
+              <span class="signal-label">异常处理</span>
+              <span class="signal-value ${result.exceptionCase !== "none" ? "required" : ""}">${escapeHtml(result.exceptionLabel)}</span>
+            </div>
+          </section>
+          <details class="reason-panel">
+            <summary>查看判断依据 <span class="reason-count">${result.reasons.length} 项</span></summary>
+            <ul class="rule-list">${reasonItems}</ul>
+          </details>
+          ${reviewPanel}
+        `;
+        bindManualReview(result);
+      }
+
+      function bindManualReview(result) {
+        const decision = $("#manualDecision");
+        if (!decision) return;
+        const reason = $("#rejectionReason");
+        const error = $("#reviewError");
+        const syncReason = () => reason.classList.toggle("hidden", decision.value !== "rejected");
+        decision.addEventListener("change", syncReason);
+        syncReason();
+        $("#applyReviewButton").addEventListener("click", () => {
+          error.textContent = "";
+          if (decision.value === "pending") {
+            error.textContent = "请选择人工审核结论。";
+            return;
+          }
+          if (decision.value === "rejected" && !reason.value.trim()) {
+            error.textContent = "拒绝时必须填写原因。";
+            return;
+          }
+
+          const next = { ...result, manualDecision: decision.value };
+          if (decision.value === "rejected") {
+            next.status = "拒绝";
+            next.statusClass = "rejected";
+            next.statusTag = "人工拒绝";
+            next.statusNote = "人工审核不通过";
+            next.actions = [`拒绝原因：${reason.value.trim()}`];
+          } else if (result.manager) {
+            next.status = "人工审核中";
+            next.statusClass = "manual";
+            next.statusTag = "待管理者确认";
+            next.statusNote = "人工审核通过，等待管理者确认";
+            next.actions = ["人工审核通过；等待管理者确认后执行退款。"];
+          } else {
+            next.status = "通过";
+            next.statusClass = "approved";
+            next.statusTag = "人工通过";
+            next.statusNote = "人工审核通过，准备执行退款";
+            next.actions = ["人工审核通过，执行退款。"];
+          }
+          renderResult(next);
+        });
+      }
+
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        clearError();
+        const values = collectValues();
+        const errors = validate(values);
+        if (errors.length) {
+          showError(errors);
+          return;
+        }
+        renderResult(evaluate(values));
+      });
+
+      infoComplete.addEventListener("change", syncMissingMaterials);
+      $("#resetButton").addEventListener("click", () => {
+        form.reset();
+        syncMissingMaterials();
+        clearError();
+        resultBody.classList.add("hidden");
+        resultBody.innerHTML = "";
+        emptyState.classList.remove("hidden");
+      });
+
+      syncMissingMaterials();
+    })();
+  </script>
+</body>
+</html>
